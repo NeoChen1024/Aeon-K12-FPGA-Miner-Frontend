@@ -1,0 +1,4 @@
+(HIGHEST PRIORITY)	Remove all Vulkan mining functionality
+(SECONDARY)		Remove all algorithm support except Aeon's K12 (CPU-only)
+(SECONDARY)		Adapt it to be a FPGA miner controller
+(*)			Design a robust communication protocol for use with my own FPGA miner core
