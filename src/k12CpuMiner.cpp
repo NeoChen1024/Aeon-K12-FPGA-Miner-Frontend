@@ -19,12 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <vulkan/vulkan.h>
 #include <string.h>
 #include <iostream>
 #include "config.hpp"
 #include "miner.hpp"
-#include "slow_hash.hpp"
 #include "network.hpp"
 
 #define LOOPS_K12 500000
@@ -216,8 +214,8 @@ static void mine(int cpuIndex, uint64_t nonce,  uint64_t target,  unsigned char 
         ss[5] |= nonce >> 8;
         algo_k12(ss,bcs+8*cpuIndex);
         if (ss[3] < target) {
-        	notifyResult(nonce,(unsigned char*)ss,input,0);
-    		incGoodHash(cpuIndex+MAX_GPUS);
+		notifyResult(nonce,(unsigned char*)ss,input,0);
+		incGoodHash(cpuIndex);
         }
     }
 #else
@@ -233,7 +231,7 @@ static void mine(int cpuIndex, uint64_t nonce,  uint64_t target,  unsigned char 
     		ss[2] = savei[32*cpuIndex+2];
     		ss[3] = savei[32*cpuIndex+3];
            	notifyResult(nonce,(unsigned char*)ss,input,0);
-       		incGoodHash(cpuIndex+MAX_GPUS);
+		incGoodHash(cpuIndex);
         	memcpy(ss,is,25*8);
     	}
     }
@@ -250,34 +248,24 @@ void *K12CpuMinerThread(void *args)
 	CPUMiner miner = *(CPUMiner*)args;
 	int inputLen;
 	unsigned char input[MAX_BLOB_SIZE/2];
-	int64_t nonce = getRandomNonce(miner.global_index);
+	int64_t nonce = getRandomNonce(miner.index);
 	getCurrentBlob(input,&inputLen);
 	unsigned char originalInput[MAX_BLOB_SIZE/2];
 	memcpy(originalInput,input,inputLen);
 	uint64_t target = getTarget();
-	uint32_t variant = getVariant();
-	if (variant != K12_ALGO)
-		return NULL;
-	CryptoType currentCrypto = getCryptoType(getCurrentIndex());
 
 	uint64_t t0 = now();
 	while (!getStopRequested()) {
-		if (variant != getVariant() || currentCrypto != getCryptoType(getCurrentIndex())) {
-			currentCrypto = getCryptoType(getCurrentIndex());
-			variant = getVariant();
-			miner.type = currentCrypto;
-		}
-
 		if (!checkBlob((unsigned char *)originalInput)) {
 			getCurrentBlob(input,&inputLen);
 			memcpy(originalInput,input,MAX_BLOB_SIZE/2);
-			nonce=	getRandomNonce(miner.global_index);
+			nonce = getRandomNonce(miner.index);
 			target = getTarget();
 		}
 		mine(miner.index,nonce,target,(unsigned char *)originalInput);
 		nonce += LOOPS_K12;
 		uint64_t hps = 1000000000L*(uint64_t)LOOPS_K12 / (now() - t0);
-		setHashRates(MAX_GPUS+miner.index,hps);
+		setHashRates(miner.index, hps);
 		t0 = now();
 	}
 

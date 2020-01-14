@@ -58,13 +58,9 @@ void errornc(const char *title, const char *msg) {
 }
 
 void printDate() {
+	char timestr[256];
 	time_t t = time(NULL);
 	struct tm tm = *localtime(&t);
-	printf("[%02d:%02d:%02d] ",tm.tm_hour, tm.tm_min, tm.tm_sec);
-}
-
-VKAPI_ATTR VkBool32 VKAPI_CALL myDebugReportCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType, uint64_t object, size_t location, int32_t messageCode,
-		const char* pLayerPrefix, const char* pMessage, void* pUserData) {
-	cout << pMessage << "\n";
-	return VK_FALSE;
+	strftime(timestr, 256, "%FT%T", &tm);
+	printf("[%s] ", timestr);
 }

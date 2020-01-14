@@ -3,17 +3,15 @@
 
 #define CONNECT_TIMEOUT 3
 #define CHECK_POOL_TIMEOUT 100L
-#define MINING_AGENT	"vulkan XMR miner"
-#define DEV_HOST		"dev.vulkanmines.net"
-#define DEV_PORT		8081
+#define MINING_AGENT	"Aeon K12 FPGA Miner"
 #define MAX_BLOB_SIZE 	256
 #define MAX_TARGET_SIZE 17
 
 void initNetwork(const CPUMiner &cpuMiner);
 void closeNetwork();
-bool lookForPool(int index);
-bool connectToPool(int index);
-void closeConnection(int index);
+bool lookForPool();
+bool connectToPool();
+void closeConnection();
 void getCurrentBlob(unsigned char *blob, int *size);
 uint64_t getTarget();
 uint32_t getHeight();
@@ -28,12 +26,11 @@ uint32_t getVariant();
 int getInvalidShares();
 int getExpiredShares();
 int getCurrentPool();
-CryptoType getCryptoType(int index);
 int getCurrentIndex();
 void setHashesPerSec(float hashesPerSec);
 float getHashesPerSec();
 void setTotalShares(int totalShares);
 uint32_t getTotalShares();
-void registerPool(const char* name, int port,const char *wallet, const char *password, int index);
+void registerPool(const char* name, int port,const char *wallet, const char *password);
 
 #endif /* NETWORK_HPP_ */

@@ -36,44 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "log.hpp"
 #include "config.hpp"
 #include "miner.hpp"
-#include "slow_hash.hpp"
 #include "network.hpp"
-#ifndef __aarch64__
-#include "mvulkan.hpp"
-#endif
 
 using namespace std;
-static const char *CryptoNames[] = { "monero", "wownero", "aeon" , "turtlecoin"};
 
 Config config;
-
-uint32_t  getMemFactor(CryptoType c) {
-	switch (c) {
-	case MoneroCrypto:
-		return 1;
-	case WowneroCrypto:
-		return 1;
-	case AeonCrypto:
-		return 2;
-	case TurtleCrypto:
-		return 8;
-	}
-	return 1;
-}
-
-uint32_t  getIterationFactor(CryptoType c) {
-	switch (c) {
-	case MoneroCrypto:
-		return 1;
-	case WowneroCrypto:
-		return 1;
-	case AeonCrypto:
-		return 2;
-	case TurtleCrypto:
-		return 8;
-	}
-	return 1;
-}
 
 static const char* getJSONEntryLocation(const char *s, int len, const char *needle, bool isFatal)  {
 	const char *loc = strstr(s, needle);
@@ -132,29 +99,12 @@ static int getIntProperty(const char*src) {
 static string createJsonFromConfig() {
 	ostringstream s;
 	s << "{\n";
-	s << " \"crypto\" : \"" << CryptoNames[config.type] << "\",\n";
-	s << " \"pool_address\" : \"" << config.poolAddress << ":" << config.poolPort<< "\",\n";
-	s << " \"wallet_address\" : \"" << config.address << "\",\n";
-	s << " \"pool_password\" : \"" << config.poolPassword << "\",\n";
-	s << " \"debug_network\" : \"" << (config.debugNetwork? "true" : "false") << "\",\n";
-	s << " \"console_listen_port\" : \"" << config.consoleListenPort << "\",\n";
-	s << " \"console_refresh_rate\" : \"" << config.consoleRefreshRate  << "\",\n";
-	if (config.type == AeonCrypto)
-		s << " \"number_cpus\" : \"" << config.nbCPUs  << "\",\n";
-
-	s << " \"cards\" : [\n";
-	for (int i=0; i < config.nbGpus; i++) {
-		s << "  {\n";
-		s << "    \"index\"    : \"" << config.gpus[i].index << "\",\n";
-		s << "    \"cu\"       : \"" << config.gpus[i].cu << "\",\n";
-		s << "    \"factor\"   : \"" << config.gpus[i].factor << "\",\n";
-		s << "    \"worksize\" : \"" << config.gpus[i].worksize << "\",\n";
-		s << "    \"mem_chunk\": \"2\"\n";
-		s << "  }";
-		if (i< config.nbGpus -1) s << ",";
-		s << "  \n";
-	}
-	s << " ]\n";
+	s << "\t\"pool_address\" : \"" << config.poolAddress << ":" << config.poolPort<< "\",\n";
+	s << "\t\"wallet_address\" : \"" << config.address << "\",\n";
+	s << "\t\"pool_password\" : \"" << config.poolPassword << "\",\n";
+	s << "\t\"debug_network\" : \"" << (config.debugNetwork? "true" : "false") << "\",\n";
+	s << "\t\"console_refresh_rate\" : \"" << config.consoleRefreshRate  << "\",\n";
+	s << "\t\"number_cpus\" : \"" << config.nbCPUs  << "\"\n";
 	s << "}\n";
 	return s.str();
 }
@@ -163,24 +113,6 @@ static void decodeConfig(const char *conf)  {
 	const char *loc;
 	int len = strlen(conf);
 	char tmp[256];
-
-	// decode crypto name
-	loc = getJSONEntryLocation(conf,len,"crypto",false);
-	config.type = MoneroCrypto;
-	if (loc != nullptr) {
-		fillStringProperty(tmp,128,loc);
-		if (strcmp(tmp,"wownero") == 0) config.type = WowneroCrypto;
-		else if (strcmp(tmp,"monero") == 0) config.type = MoneroCrypto;
-		else if (strcmp(tmp,"aeon") == 0) {
-			config.type = AeonCrypto;
-		} else if (strcmp(tmp,"turtlecoin") == 0) {
-			config.type = TurtleCrypto;
-		} else {
-			error("unrecognized crypto name","assume Monero");
-		}
-	}
-	config.memFactor = getMemFactor(config.type);
-	config.iterationFactor = getIterationFactor(config.type);
 
 	// decode wallet
 	loc = getJSONEntryLocation(conf,len,"pool_address",true);
@@ -209,13 +141,6 @@ static void decodeConfig(const char *conf)  {
 	} else
 		config.debugNetwork = false;
 
-	loc = getJSONEntryLocation(conf,len,"console_listen_port",false);
-	if (loc != nullptr) {
-		fillStringProperty(tmp,128,loc);
-		config.consoleListenPort = atoi(tmp);
-	} else
-		config.consoleListenPort = 0;
-
 	loc = getJSONEntryLocation(conf,len,"console_refresh_rate",false);
 	if (loc != nullptr) {
 		fillStringProperty(tmp,128,loc);
@@ -230,55 +155,7 @@ static void decodeConfig(const char *conf)  {
 	if (loc != nullptr)
 		config.nbCPUs = getIntProperty(loc);
 	else
-		config.nbCPUs = 0;
-
-	loc = getJSONEntryLocation(conf,len,"cards",true);
-	int cardIndex = 0;
-	while (loc != nullptr && cardIndex < MAX_GPUS) {
-		const char *p = loc;
-		len = strlen(p);
-		p = getJSONEntryLocation(p,len,"index",false);
-		if (p == nullptr)
-			break;
-		config.gpus[cardIndex].index = getIntProperty(loc);
-		loc = getJSONEntryLocation(p,len,"cu",false);
-		if (loc != nullptr)
-			config.gpus[cardIndex].cu = getIntProperty(loc);
-		else
-			config.gpus[cardIndex].cu = 14;
-		loc = getJSONEntryLocation(p,len,"factor",false);
-		if (loc != nullptr)
-			config.gpus[cardIndex].factor = getIntProperty(loc);
-		else
-			config.gpus[cardIndex].factor = 16;
-		loc = getJSONEntryLocation(p,len,"worksize",false);
-		if (loc != nullptr)
-			config.gpus[cardIndex].worksize = getIntProperty(loc);
-		else
-			config.gpus[cardIndex].worksize = 8;
-		if (config.gpus[cardIndex].worksize != 8 && config.gpus[cardIndex].worksize != 16) {
-			exitOnError("unsupported worksize - only 8 and 16 are supported");
-		}
-		loc = getJSONEntryLocation(p,len,"mem_chunk",false);
-		if (loc != nullptr)
-			config.gpus[cardIndex].chunk2 = getIntProperty(loc);
-		else
-			config.gpus[cardIndex].chunk2 = 2;
-
-		if (config.gpus[cardIndex].chunk2 < 1 || config.gpus[cardIndex].chunk2 > 16) {
-			exitOnError("mem_chunk must be in 1..16 range");
-		}
-
-		p++;
-		while (*p != '}' && *p != 0) p++;
-
-		loc = p;
-		if (*loc == 0)
-			exitOnError("Malformed JSON configuration file");
-
-		cardIndex ++;
-	}
-	config.nbGpus = cardIndex;
+		config.nbCPUs = 1;
 }
 
 static void setTerminalBehavior() {
@@ -312,203 +189,75 @@ static string filterComments(const string & s) {
 void makeConfig() {
 	std::string input;
 	setTerminalBehavior();
-#ifndef __aarch64__
-	setConfigMode(true);
-	cout << "Please use recent drivers for better support and performance. Vulkan is a pretty new API.\n";
-	cout << "You can get more about Vulkan at https://www.amd.com/en/technologies/vulkan or https://developer.nvidia.com/vulkan-driver \n\n";
-#endif
 	cout << "\nNo config.json file found, entering configuration setup...\n";
 
-select1:
-	cout << "Select a crypto:\n";
-#ifndef __aarch64__
-	cout << " 0 for Monero\n";
-	cout << " 1 for Wownero\n";
-	cout << " 2 for Aeon v7/v8 - cryptonight light or K12\n";
-	cout << " 3 for TurtleCoin\n";
-#else
-	cout << " 2 for Aeon K12\n";
-#endif
-	cout << "Your crypto: ";
-	config.type = MoneroCrypto;
-    std::getline(cin, input );
-    if ( !input.empty() ) {
-        istringstream stream( input );
-        int s;
-        stream >> s;
-        config.type = (CryptoType)s;
-    }
-	if (config.type > TurtleCrypto) {
-		cout << "Wrong selection!!\n";
-		goto select1;
-	}
-
-	// figlet
-	switch (config.type) {
-		case MoneroCrypto:
-			cout<<" __  __							 \n";
-			cout<<"|  \\/  | ___  _ __   ___ _ __ ___   \n";
-			cout<<"| |\\/| |/ _ \\| '_ \\ / _ \\ '__/ _ \\  \n";
-			cout<<"| |  | | (_) | | | |  __/ | | (_) | \n";
-			cout<<"|_|  |_|\\___/|_| |_|\\___|_|  \\___/  \n";
-			break;
-		case WowneroCrypto:
-			cout<<"__        _______        __  _   \n";
-			cout<<"\\ \\      / / _ \\ \\      / / | |  \n";
-			cout<<" \\ \\ /\\ / / | | \\ \\ /\\ / /  | |  \n";
-			cout<<"  \\ V  V /| |_| |\\ V  V /   |_|  \n";
-			cout<<"   \\_/\\_/  \\___/  \\_/\\_/    (_)  \n";
-			break;
-
-		case AeonCrypto:
-			cout<<"    _                      \n";
-			cout<<"   / \\   ___  ___  _ __    \n";
-			cout<<"  / _ \\ / _ \\/ _ \\| '_ \\   \n";
-			cout<<" / ___ \\  __/ (_) | | | |  \n";
-			cout<<"/_/   \\_\\___|\\___/|_| |_|  \n";
-			break;
-
-		case TurtleCrypto:
-			cout<<" _____           _   _         ____      _\n";
-			cout<<"|_   _|   _ _ __| |_| | ___   / ___|___ (_)_ __\n";
-			cout<<"  | || | | | '__| __| |/ _ \\ | |   / _ \\| | '_ \\ \n";
-			cout<<"  | || |_| | |  | |_| |  __/ | |__| (_) | | | | |\n";
-			cout<<"  |_| \\__,_|_|   \\__|_|\\___|  \\____\\___/|_|_| |_|\n";
-
-	}
-
+	cout<<"    _                      \n";
+	cout<<"   / \\   ___  ___  _ __    \n";
+	cout<<"  / _ \\ / _ \\/ _ \\| '_ \\   \n";
+	cout<<" / ___ \\  __/ (_) | | | |  \n";
+	cout<<"/_/   \\_\\___|\\___/|_| |_|  \n";
 	cout << "\n";
-	config.memFactor = getMemFactor(config.type);
 
-select2:
+pool_select:
 	cout << "Mining pool address (hostname/IP): ";
-    getline(cin, input );
-    if ( input.empty() ) goto select2;
-    else {
-        istringstream stream( input );
-        stream >> config.poolAddress;
-    }
-
-select3:
-	cout << "Mining pool port: ";
-    getline(cin, input );
-    if ( input.empty() ) goto select3;
-    else {
-        istringstream stream( input );
-        stream >> config.poolPort;
-    }
-
-    registerPool(config.poolAddress,config.poolPort,"","",1);
-	if (!lookForPool(1)) {
-		cout << "Can't connect to the pool at " << config.poolAddress << ":" << config.poolPort << "\n";
-		goto select2;
-	}
-	closeConnection(1);
-
-select4:
-	cout << "Your address (with optional .something at the end): ";
-    getline(cin, input );
-    if ( input.empty() ) goto select4;
-    else {
-        istringstream stream( input );
-        stream >> config.address;
-    }
-	cout << "Password (or x if none): ";
-    getline(cin, input );
-    if ( !input.empty() ) {
-        istringstream stream( input );
-        stream >> config.poolPassword;
-    } else {
-    	config.poolPassword[0] = 'x';
-    	config.poolPassword[1] = 0;
-    }
-
-   	cout << "Monitoring listen port (0 if no JSON/graphic console): ";
 	getline(cin, input );
-	if ( input.empty() ) {
-		config.consoleListenPort = 0;
-	} else {
+	if ( input.empty() ) goto pool_select;
+	else {
 		istringstream stream( input );
-		stream >> config.consoleListenPort;
+		stream >> config.poolAddress;
 	}
 
-	if (config.consoleListenPort > 0) {
-	   	cout << "Console refresh rate (default 30s): ";
-		getline(cin, input );
-		if ( input.empty() ) {
-			config.consoleRefreshRate = DEFAULT_CONSOLE_REFRESH_RATE;
-		} else {
-			istringstream stream( input );
-			stream >> config.consoleRefreshRate;
-		}
-	} else
-		config.consoleRefreshRate = DEFAULT_CONSOLE_REFRESH_RATE;
-
-#ifndef __aarch64__
-	int nbDevices = vulkanInit();
-
-	cout << "\nChecking your cards\n";
-	char deviceName[256];
-	for (int i=0; i< nbDevices; i++ ) {
-		getDeviceName(i,deviceName);
-		cout << "Index:" << i <<" MemorySize:" << getMemorySize(i) << " Gb - " << deviceName << "\n";
+port_select:
+	cout << "Mining pool port: ";
+	getline(cin, input );
+	if ( input.empty() ) goto port_select;
+	else {
+		istringstream stream( input );
+		stream >> config.poolPort;
 	}
 
-	cout << "\nFinding best configuration....\n";
-	int cardIndex = 0;
-	for (int i=0; i< nbDevices; i++ ) {
-		VkDevice d = createDevice(i,getComputeQueueFamillyIndex(i));
-		int cu,local_size,factor;
-		findBestSetting(d,i,cu,factor,local_size,config.memFactor,config.type);
-		cout << "Card:" << i << "  " << cu << " Compute Units/Stream Multiprocessors";
-		cout << ", using factor " << factor << " (" << (factor*cu) << " threads)";
-		cout << ", local size " << local_size << "\n";
-		cout << "Use this card [Y/n]?: ";
-	    getline(cin, input );
-	    char c = 'y';
-	    if ( !input.empty() ) {
-	        istringstream stream( input );
-	        stream >> c;
-	    }
-		if (c != 'Y' && c != 'y') continue;
-
-		config.gpus[cardIndex].index = i;
-		config.gpus[cardIndex].cu = cu;
-		config.gpus[cardIndex].factor = factor;
-		config.gpus[cardIndex].worksize = local_size;
-		cout << "Number of Compute Units [" << cu << "]:";
-	    getline(cin, input );
-	    if ( !input.empty() ) {
-	        istringstream stream( input );
-	        stream >> config.gpus[cardIndex].cu;
-	    }
-		cout << "Factor [" << factor << "]:";
-	    getline(cin, input );
-	    if ( !input.empty() ) {
-	        istringstream stream( input );
-	        stream >> config.gpus[cardIndex].factor;
-	    }
-selectWS:
-		cout << "Worksize [" << local_size << "]:";
-	    getline(cin, input );
-	    if ( !input.empty() ) {
-	        istringstream stream( input );
-	        stream >> config.gpus[cardIndex].worksize;
-	    }
-	    if (config.gpus[cardIndex].worksize != 8 && config.gpus[cardIndex].worksize != 16) {
-	    	cout << "Invalid worksize (8 or 16)\n";
-	    	goto selectWS;
-	    }
-		cardIndex++;
-		cout << "\n";
+	registerPool(config.poolAddress,config.poolPort,"","");
+	if (!lookForPool()) {
+		cout << "Can't connect to the pool at " << config.poolAddress << ":" << config.poolPort << "\n";
+		goto pool_select;
 	}
-	config.nbGpus = cardIndex;
-#else // __aarch64__
-	config.nbGpus = 0;
-#endif
+	closeConnection();
 
-	if (config.type == AeonCrypto)
-		config.nbCPUs = 1;
+address_select:
+	cout << "Your address (with optional .something at the end): ";
+	getline(cin, input );
+	if ( input.empty() ) goto address_select;
+	else {
+		istringstream stream( input );
+		stream >> config.address;
+	}
+	cout << "Password (or x if none): ";
+	getline(cin, input );
+	if ( !input.empty() ) {
+		istringstream stream( input );
+		stream >> config.poolPassword;
+	} else {
+		config.poolPassword[0] = 'x';
+		config.poolPassword[1] = 0;
+	}
+
+	cout << "Console refresh rate (default 30s): ";
+	getline(cin, input);
+	if ( input.empty() ) {
+	config.consoleRefreshRate = DEFAULT_CONSOLE_REFRESH_RATE;
+	} else {
+			istringstream stream(input);
+		stream >> config.consoleRefreshRate;
+	}
+
+	cout << "CPUs: ";
+	getline(cin, input);
+	if ( input.empty() ) {
+	config.nbCPUs = 1;
+	} else {
+		istringstream stream(input);
+		stream >> config.nbCPUs;
+	}
 
 	string confStr = createJsonFromConfig();
 	ofstream out("config.json");
@@ -517,7 +266,7 @@ selectWS:
 
 	cout << "Proposed configuration:\n";
 	puts(confStr.c_str());
-	cout << "Play with the parameters for optimum hashrate.\n";
+	cout << "Happy FPGA hashing,\n";
 	cout << " _____        _               _  \n";
 	cout << "| ____|_ __  (_) ___  _   _  | | \n";
 	cout << "|  _| | '_ \\ | |/ _ \\| | | | | | \n";
@@ -525,10 +274,6 @@ selectWS:
 	cout << "|_____|_| |_|/ |\\___/ \\__, | (_) \n";
 	cout << "           |__/       |___/      \n\n";
 
-#ifndef __aarch64__
-	vulkanEnd();
-	setConfigMode(false);
-#endif
 #ifdef __MINGW32__
 	Sleep(4);				// time to read before cmd exit
 #endif

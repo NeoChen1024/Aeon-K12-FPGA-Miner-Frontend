@@ -1,3 +1,5 @@
 config.json
 *.o
 miner
+*.kdev4
+.kdev4
