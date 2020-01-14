@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
 		error("Error initialising WSA.",NULL);
 	}
 #endif
-	cout << "Vulkan SPIR-V XMR Miner " << VERSION << "\n\n" << flush;
+	cout << MINING_AGENT << " " << VERSION << "\n\n" << flush;
 #ifdef __MINGW32__
 	cout << "\nIf you experience very low hashrate, close apps like firefox, chrome,..., start the miner, and then reopen them.\n";
 #endif
