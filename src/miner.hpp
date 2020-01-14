@@ -4,11 +4,7 @@
 #include "config.hpp"
 #include "network.hpp"
 
-#ifdef __MINGW32__
-DWORD WINAPI K12CpuMinerThread(LPVOID args);
-#else
 void *K12CpuMinerThread(void *args);
-#endif
 
 void incGoodHash(int gpuIndex);
 void incBadHash(int gpuIndex);

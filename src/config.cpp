@@ -159,10 +159,8 @@ static void decodeConfig(const char *conf)  {
 }
 
 static void setTerminalBehavior() {
-#ifndef __MINGW32__
 	int oldfl = fcntl(STDIN_FILENO, F_GETFL, 0);
 	fcntl(STDIN_FILENO, F_SETFL,  oldfl & ~O_NONBLOCK);
-#endif
 }
 
 

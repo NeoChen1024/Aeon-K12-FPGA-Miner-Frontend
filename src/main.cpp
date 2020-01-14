@@ -43,28 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
-#ifdef __MINGW32__
-static const char *START_STUCKED="";
-static const char *START_GREEN="";
-static const char *START_LIGHT_GREEN = "";
-static const char *START_WHITE="";
-#define THREAD_HANDLE HANDLE
-#else
 static const char *START_STUCKED = "\e[91m";
 static const char *START_GREEN = "\e[32m";
 static const char *START_LIGHT_GREEN = "\e[92m";
 static const char *START_WHITE = "\e[39m";
 #define THREAD_HANDLE pthread_t
-#endif
 
 static 	CPUMiner cpuMiners[MAX_CPUS];
 
-#ifdef __MINGW32__
-int getKey() {
-	if(kbhit()) return getch();
-	else return 0;
-}
-#else
 int getKey() {
 	struct termios oldt, newt;
 	int oldf;
@@ -86,20 +72,10 @@ int getKey() {
 	else
 		return 0;
 }
-#endif
 
 int main(int argc, char **argv) {
-#ifdef __MINGW32__
-	// init windows tcp sockets
-	WSADATA wsaData;
-	if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
-		error("Error initialising WSA.",NULL);
-	}
-#endif
 	cout << MINING_AGENT << " " << VERSION << "\n\n" << flush;
-#ifdef __MINGW32__
-	cout << "\nIf you experience very low hashrate, close apps like firefox, chrome,..., start the miner, and then reopen them.\n";
-#endif
+
 	if (!checkConfig())
 		makeConfig();
 
@@ -128,12 +104,7 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < config.nbCPUs; i++) {
 		cpuMiners[i] = cpuMiner;
 		cpuMiners[i].index = i;
-#ifdef __MINGW32__
-		DWORD ThreadId;
-		threads[i] = CreateThread(NULL,0,K12CpuMinerThread, &cpuMiners[i],0,&ThreadId);
-#else
 		pthread_create(&threads[i], NULL, K12CpuMinerThread, &cpuMiners[i]);
-#endif
 	}
 
 	cout << "Mining started.... (Press q to stop)\n";
@@ -208,14 +179,7 @@ int main(int argc, char **argv) {
 	requestStop();
 	cout << "Shutdown requested....\n";
 	for (int i = 0; i < config.nbCPUs; i++)
-#ifdef __MINGW32__
-		WaitForSingleObject(threads[i],INFINITE);
-#else
 		pthread_join(threads[i], NULL);
-#endif
 
-#ifdef __MINGW32__
-	WSACleanup();
-#endif
 	return 0;
 }

@@ -17,18 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef __MINGW32__
-#include <ws2tcpip.h>
-#include <winsock.h>
-#include <winsock2.h>
-#include <windows.h>
-#define MSG_NOSIGNAL 0
-#else
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#endif
 #include <sys/types.h>
 #include <string.h>
 #include <unistd.h>
@@ -54,15 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define QUEUE_SIZE 		64
 #define NONCE_LOCATION	39
 
-#ifdef __MINGW32__
-static const char *START_YELLOW="";
-static const char *START_WHITE="";
-static const char *START_RED="";
-#else
 static const char *START_YELLOW ="\e[33m";
 static const char *START_WHITE = "\e[39m";
 static const char *START_RED=	 "\e[91m";
-#endif
 
 static int connections;
 static char hexBlob[MAX_BLOB_SIZE];
@@ -85,14 +71,9 @@ static int successiveInvalidShares;
 static const char CONVHEX[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
 // Network queue
-#ifdef __MINGW32__
-static HANDLE mutex;
-static HANDLE mutexQueue;
-#else
 static pthread_t thread_id;
 static sem_t mutex;
 static sem_t mutexQueue;
-#endif
 static int tail;
 static int head;
 struct MsgResult {
@@ -193,11 +174,8 @@ static bool getBlob(const char *msg) {
 	hexBlob[i++] = 0;
 	assert(i < MAX_BLOB_SIZE);
 
-#ifdef __MINGW32__
-	WaitForSingleObject(mutex, INFINITE);
-#else
 	sem_wait(&mutex);
-#endif
+
 	memset(blob,0,MAX_BLOB_SIZE/2);
 	// convert from hex representation
 	for (int j = 0; j < i / 2; j++) {
@@ -206,11 +184,7 @@ static bool getBlob(const char *msg) {
 		blob[j] = k;
 	}
 	blobSize = i / 2;
-#ifdef __MINGW32__
-	ReleaseMutex(mutex);
-#else
 	sem_post(&mutex);
-#endif
 
 	return true;
 }
@@ -297,20 +271,12 @@ static bool decodeHeight(const char *msg) {
 }
 
 void getCurrentBlob(unsigned char *input, int *size) {
-#ifdef __MINGW32__
-	WaitForSingleObject(mutex, INFINITE);
-#else
 	sem_wait(&mutex);
-#endif
 	memset(input, 0, MAX_BLOB_SIZE/2);
 	memcpy(input, blob, blobSize);
 	input[blobSize] = 0x01;
 	*size = blobSize;
-#ifdef __MINGW32__
-	ReleaseMutex(mutex);
-#else
 	sem_post(&mutex);
-#endif
 }
 
 void applyNonce(unsigned char *input, uint64_t nonce) {
@@ -355,7 +321,6 @@ bool lookForPool() {
 	addr.sin_port = htons(port);
 	addr.sin_addr.s_addr = inet_addr(ip);
 
-#ifndef __MINGW32__
 	uint64_t arg;
 	// Set non-blocking
 	if ((arg = fcntl(soc, F_GETFL, NULL)) < 0) {
@@ -369,7 +334,6 @@ bool lookForPool() {
 		exitOnError("Can't continue");
 		return false;
 	}
-#endif
 
 	// Trying to connect with timeout
 	errornc("Connecting to", fullName);
@@ -391,14 +355,6 @@ bool lookForPool() {
 	}
 	error("done!", "");
 
-#ifdef __MINGW32__
-	// SET THE TIME OUT
-	DWORD timeout = 300;
-	if (setsockopt(soc, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(DWORD))) {
-		printf("Error: %d\n",WSAGetLastError());
-		error("setsockopt error",NULL);
-	}
-#else
 	// Set to blocking mode again...
 	if ((arg = fcntl(soc, F_GETFL, NULL)) < 0) {
 		error("Error fcntl(..., F_GETFL)", strerror(errno));
@@ -409,7 +365,6 @@ bool lookForPool() {
 		error("Error fcntl(..., F_SETFL)", strerror(errno));
 		exitOnError("");
 	}
-#endif
 
 	connections = soc;
 	return true;
@@ -577,15 +532,6 @@ bool checkBlockBlob(const unsigned char *_blob) {
 static void checkPoolResponds() {
 	char msg[4096];
 	int len = 0;
-#if __MINGW32__
-	DWORD timeout = CHECK_POOL_TIMEOUT;
-	if (setsockopt(connections[index], SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(DWORD))) {
-		printf("Error: %d\n",WSAGetLastError());
-		error("setsockopt error",NULL);
-	}
-	len = recv(connections, msg, 4096,0);
-	msg[len] = 0;
-#else
 	struct timeval tv;
 	tv.tv_sec = 0;
 	tv.tv_usec = CHECK_POOL_TIMEOUT*1000L;
@@ -603,7 +549,6 @@ static void checkPoolResponds() {
 		len = read(connections, msg, 4096);
 		msg[len] = 0;
 	}
-#endif
 	if (debugNetwork && current_index == 0 && len > 0)
 		cout << START_YELLOW << "RECV " << msg << START_WHITE;
 
@@ -659,20 +604,12 @@ static void submitResult(int64_t nonce, const unsigned char *result, int index) 
 }
 
 void notifyResult(int64_t nonce, const unsigned char *hash, unsigned char *_blob, uint32_t height) {
-#ifdef __MINGW32__
-	WaitForSingleObject(mutexQueue, INFINITE);
-#else
 	sem_wait(&mutexQueue);
-#endif
 	msgResult[head].nonce = nonce;
 	memcpy(msgResult[head].blob, _blob, MAX_BLOB_SIZE / 2);
 	memcpy(msgResult[head].hash, hash, 64);
 	head = (head + 1) % QUEUE_SIZE;
-#ifdef __MINGW32__
-	ReleaseMutex(mutexQueue);
-#else
 	sem_post(&mutexQueue);
-#endif
 }
 
 static bool checkAndConsume() {
@@ -727,11 +664,7 @@ uint32_t getTotalShares() {
 	return totalShares;
 }
 
-#ifdef __MINGW32__
-DWORD WINAPI networkThread(LPVOID args) {
-#else
 void *networkThread(void *args) {
-#endif
 	while (!stopRequested) {
 		checkAndConsume();
 		if (current_index == 0 && connections == 0) {
@@ -743,30 +676,16 @@ void *networkThread(void *args) {
 		}
 		checkPoolResponds();
 	}
-#ifdef __MINGW32__
-	return 0;
-#else
 	return NULL;
-#endif
 }
 
 void startNetworkBG() {
-#ifdef __MINGW32__
-	DWORD ThreadId;
-	CreateThread(NULL,0,networkThread, NULL,0,&ThreadId);
-#else
 	pthread_create(&thread_id, NULL, networkThread, NULL);
-#endif
 }
 
 void initNetwork(const CPUMiner &cpuMiner) {
-#ifdef __MINGW32__
-	mutex = CreateMutex(NULL,FALSE,"Network");
-	mutexQueue = CreateMutex(NULL,FALSE,"Network queue");
-#else
 	sem_init(&mutex, 0, 1);
 	sem_init(&mutexQueue, 0, 1);
-#endif
 
 	tail = 0;
 	head = 0;

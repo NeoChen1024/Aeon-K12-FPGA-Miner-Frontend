@@ -227,11 +227,7 @@ static void mine(int cpuIndex, uint64_t nonce,  uint64_t target,  unsigned char 
     }
 }
 
-#ifdef __MINGW32__
-DWORD WINAPI K12CpuMinerThread(LPVOID args)
-#else
 void *K12CpuMinerThread(void *args)
-#endif
 {
 	// force the copy constructor
 	CPUMiner miner = *(CPUMiner*)args;
@@ -259,11 +255,8 @@ void *K12CpuMinerThread(void *args)
 	}
 
 	std::cout << "Miner[" << miner.index << "] closed\n";
-#ifdef __MINGW32__
-	return 0;
-#else
+
 	return NULL;
-#endif
 }
 
 // not thread safe, but don't care if we loose one
