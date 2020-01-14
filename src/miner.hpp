@@ -10,7 +10,6 @@ DWORD WINAPI K12CpuMinerThread(LPVOID args);
 void *K12CpuMinerThread(void *args);
 #endif
 
-void initMiners();
 void incGoodHash(int gpuIndex);
 void incBadHash(int gpuIndex);
 int getGoodHash(int gpuIndex);

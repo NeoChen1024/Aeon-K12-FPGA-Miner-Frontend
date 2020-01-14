@@ -110,7 +110,6 @@ int main(int argc, char **argv) {
 	cpuMiner.debugNetwork = config.debugNetwork;
 
 	initNetwork(cpuMiner);
-	initMiners();
 
 	registerPool(config.poolAddress,config.poolPort,config.address, config.poolPassword);
 	if (lookForPool())
