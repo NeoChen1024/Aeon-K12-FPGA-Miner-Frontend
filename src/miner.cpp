@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "network.hpp"
 #include "miner.hpp"
 
-static uint32_t goodHash[MAX_CPUS];
-static uint32_t badhash[MAX_CPUS];
-static uint64_t hashRates[MAX_CPUS];
+static volatile uint32_t goodHash[MAX_CPUS];
+static volatile uint32_t badhash[MAX_CPUS];
+static volatile uint64_t hashRates [MAX_CPUS];
 
 #define LOOPS_K12 500000
 
@@ -268,7 +268,6 @@ void incGoodHash(int gpuIndex) {
 void incBadHash(int gpuIndex) {
 	badhash[gpuIndex]++;
 }
-
 
 int getGoodHash(int gpuIndex) {
 	return goodHash[gpuIndex];

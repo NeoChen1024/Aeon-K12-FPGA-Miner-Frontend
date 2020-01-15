@@ -321,7 +321,7 @@ bool lookForPool() {
 	addr.sin_port = htons(port);
 	addr.sin_addr.s_addr = inet_addr(ip);
 
-	uint64_t arg;
+	int arg;
 	// Set non-blocking
 	if ((arg = fcntl(soc, F_GETFL, NULL)) < 0) {
 		error("Error fcntl(..., F_GETFL) ", strerror(errno));
@@ -379,19 +379,13 @@ static void WaitForJob() {
 uint64_t getTarget() {
 	WaitForJob();
 	if (target != 0) {
-		if (getVariant() != K12_ALGO)
-			return 0xFFFFFFFFUL * target;
-		else
-			return target;
+		return target;
 	} else
 		return 0;
 }
 
 uint64_t getRandomNonce(int gpuIndex) {
-	if (getVariant() != K12_ALGO)
-		return gpuIndex * 5 * 3600 * 2000; // 5 hours at 2kH/s;
-	else
-		return uint64_t((uint64_t)gpuIndex * 5L * 3600L * 2000L)*1000L*1000L; // 5 hours at 2GH/s;
+	return uint64_t((uint64_t)gpuIndex * 5L * 3600L * 2000L)*1000L*1000L; // 5 hours at 2GH/s;
 }
 
 bool connectToPool() {
@@ -702,12 +696,4 @@ void initNetwork(const CPUMiner &cpuMiner) {
 
 void closeNetwork() {
 	stopRequested = true;
-}
-
-int getCurrentPool() {
-	return current_index;
-}
-
-int getCurrentIndex() {
-	return current_index;
 }
