@@ -72,8 +72,8 @@ static const char CONVHEX[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '
 
 // Network queue
 static pthread_t thread_id;
-static sem_t mutex;
-static sem_t mutexQueue;
+static sem_t net_mutex;
+static sem_t net_mutexQueue;
 static int tail;
 static int head;
 struct MsgResult {
@@ -174,7 +174,7 @@ static bool getBlob(const char *msg) {
 	hexBlob[i++] = 0;
 	assert(i < MAX_BLOB_SIZE);
 
-	sem_wait(&mutex);
+	sem_wait(&net_mutex);
 
 	memset(blob,0,MAX_BLOB_SIZE/2);
 	// convert from hex representation
@@ -184,7 +184,7 @@ static bool getBlob(const char *msg) {
 		blob[j] = k;
 	}
 	blobSize = i / 2;
-	sem_post(&mutex);
+	sem_post(&net_mutex);
 
 	return true;
 }
@@ -271,12 +271,12 @@ static bool decodeHeight(const char *msg) {
 }
 
 void getCurrentBlob(unsigned char *input, int *size) {
-	sem_wait(&mutex);
+	sem_wait(&net_mutex);
 	memset(input, 0, MAX_BLOB_SIZE/2);
 	memcpy(input, blob, blobSize);
 	input[blobSize] = 0x01;
 	*size = blobSize;
-	sem_post(&mutex);
+	sem_post(&net_mutex);
 }
 
 void applyNonce(unsigned char *input, uint64_t nonce) {
@@ -598,12 +598,12 @@ static void submitResult(int64_t nonce, const unsigned char *result, int index) 
 }
 
 void notifyResult(int64_t nonce, const unsigned char *hash, unsigned char *_blob, uint32_t height) {
-	sem_wait(&mutexQueue);
+	sem_wait(&net_mutexQueue);
 	msgResult[head].nonce = nonce;
 	memcpy(msgResult[head].blob, _blob, MAX_BLOB_SIZE / 2);
 	memcpy(msgResult[head].hash, hash, 64);
 	head = (head + 1) % QUEUE_SIZE;
-	sem_post(&mutexQueue);
+	sem_post(&net_mutexQueue);
 }
 
 static bool checkAndConsume() {
@@ -678,8 +678,8 @@ void startNetworkBG() {
 }
 
 void initNetwork(const CPUMiner &cpuMiner) {
-	sem_init(&mutex, 0, 1);
-	sem_init(&mutexQueue, 0, 1);
+	sem_init(&net_mutex, 0, 1);
+	sem_init(&net_mutexQueue, 0, 1);
 
 	tail = 0;
 	head = 0;
