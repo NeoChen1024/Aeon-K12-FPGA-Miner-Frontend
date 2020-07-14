@@ -23,15 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
-#ifdef __MINGW32__
-#include <ws2tcpip.h>
-#include <winsock.h>
-#include <winsock2.h>
-#include <conio.h>
-#include <windows.h>
-#else
 #include <termios.h>
-#endif
 #include <unistd.h>
 #include <iomanip>
 

@@ -22,13 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#ifdef __MINGW32__
-#include <ws2tcpip.h>
-#include <winsock.h>
-#include <winsock2.h>
-#else
 #include <termios.h>
-#endif
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -271,10 +265,6 @@ address_select:
 	cout << "| |___| | | || | (_) | |_| | |_| \n";
 	cout << "|_____|_| |_|/ |\\___/ \\__, | (_) \n";
 	cout << "           |__/       |___/      \n\n";
-
-#ifdef __MINGW32__
-	Sleep(4);				// time to read before cmd exit
-#endif
 }
 
 bool readConfig() {
